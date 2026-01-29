@@ -474,7 +474,12 @@ pub fn collect_all_segments(
                 segment.collect(input)
             }
             crate::config::SegmentId::Directory => {
-                let segment = DirectorySegment::new();
+                let show_full_path = segment_config
+                    .options
+                    .get("show_full_path")
+                    .and_then(|v| v.as_bool())
+                    .unwrap_or(false);
+                let segment = DirectorySegment::new().with_full_path(show_full_path);
                 segment.collect(input)
             }
             crate::config::SegmentId::Git => {
