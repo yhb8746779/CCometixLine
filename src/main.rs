@@ -167,12 +167,39 @@ fn visible_width(text: &str) -> usize {
     width
 }
 
+/// Get terminal width using multiple fallback methods
+fn get_terminal_width() -> Option<usize> {
+    // Method 1: Try terminal_size on stderr (stderr is usually still connected to terminal)
+    if let Some((terminal_size::Width(w), _)) = terminal_size::terminal_size_using_fd(2) {
+        return Some(w as usize);
+    }
+
+    // Method 2: Try COLUMNS environment variable
+    if let Ok(cols) = std::env::var("COLUMNS") {
+        if let Ok(w) = cols.parse::<usize>() {
+            return Some(w);
+        }
+    }
+
+    // Method 3: Try terminal_size on stdout (fallback)
+    if let Some((terminal_size::Width(w), _)) = terminal_size::terminal_size() {
+        return Some(w as usize);
+    }
+
+    None
+}
+
 /// Truncate statusline to fit within a percentage of terminal width
 fn truncate_to_terminal_width(text: &str, percent: usize) -> String {
-    let max_width = if let Some((terminal_size::Width(w), _)) = terminal_size::terminal_size() {
-        (w as usize * percent) / 100
+    let max_width = if let Some(term_width) = get_terminal_width() {
+        // Reserve space for Claude Code's context indicator (~40 chars)
+        let reserved_for_context = 40;
+        let available = term_width.saturating_sub(reserved_for_context);
+        // Use the smaller of: percentage-based limit or available space
+        std::cmp::min((term_width * percent) / 100, available)
     } else {
-        return text.to_string(); // Can't determine width, return as-is
+        // Fallback: assume 120 char terminal, use 60%
+        72
     };
 
     let current_width = visible_width(text);
