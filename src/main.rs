@@ -138,7 +138,72 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let generator = StatusLineGenerator::new(config);
     let statusline = generator.generate(segments_data);
 
+    // Truncate statusline to fit terminal width (leave space for Claude Code's context indicator)
+    let statusline = truncate_to_terminal_width(&statusline, 60);
+
     println!("{}", statusline);
 
     Ok(())
+}
+
+/// Calculate visible width of text (excluding ANSI escape sequences)
+fn visible_width(text: &str) -> usize {
+    let mut width = 0;
+    let mut in_escape = false;
+
+    for ch in text.chars() {
+        if ch == '\x1b' {
+            in_escape = true;
+        } else if in_escape {
+            if ch.is_alphabetic() {
+                in_escape = false;
+            }
+        } else {
+            // Count visible characters (CJK characters count as 2)
+            width += if ch > '\u{FF}' { 2 } else { 1 };
+        }
+    }
+
+    width
+}
+
+/// Truncate statusline to fit within a percentage of terminal width
+fn truncate_to_terminal_width(text: &str, percent: usize) -> String {
+    let max_width = if let Some((terminal_size::Width(w), _)) = terminal_size::terminal_size() {
+        (w as usize * percent) / 100
+    } else {
+        return text.to_string(); // Can't determine width, return as-is
+    };
+
+    let current_width = visible_width(text);
+    if current_width <= max_width {
+        return text.to_string();
+    }
+
+    // Need to truncate
+    let mut result = String::new();
+    let mut width = 0;
+    let mut in_escape = false;
+
+    for ch in text.chars() {
+        if ch == '\x1b' {
+            in_escape = true;
+            result.push(ch);
+        } else if in_escape {
+            result.push(ch);
+            if ch.is_alphabetic() {
+                in_escape = false;
+            }
+        } else {
+            let char_width = if ch > '\u{FF}' { 2 } else { 1 };
+            if width + char_width > max_width.saturating_sub(3) {
+                result.push_str("...\x1b[0m");
+                break;
+            }
+            result.push(ch);
+            width += char_width;
+        }
+    }
+
+    result
 }
