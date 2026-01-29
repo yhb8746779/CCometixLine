@@ -169,9 +169,14 @@ fn visible_width(text: &str) -> usize {
 
 /// Get terminal width using multiple fallback methods
 fn get_terminal_width() -> Option<usize> {
+    use std::io::IsTerminal;
+
     // Method 1: Try terminal_size on stderr (stderr is usually still connected to terminal)
-    if let Some((terminal_size::Width(w), _)) = terminal_size::terminal_size_using_fd(2) {
-        return Some(w as usize);
+    let stderr = std::io::stderr();
+    if stderr.is_terminal() {
+        if let Some((terminal_size::Width(w), _)) = terminal_size::terminal_size_of(&stderr) {
+            return Some(w as usize);
+        }
     }
 
     // Method 2: Try COLUMNS environment variable
