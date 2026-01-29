@@ -138,9 +138,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let generator = StatusLineGenerator::new(config);
     let statusline = generator.generate(segments_data);
 
-    // Truncate statusline to fit terminal width (leave space for Claude Code's context indicator)
-    let statusline = truncate_to_terminal_width(&statusline, 60);
-
+    // Output statusline without truncation (test multi-line support)
     println!("{}", statusline);
 
     Ok(())
